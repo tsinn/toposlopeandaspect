@@ -1,0 +1,531 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Topo Athletic x Slope and Aspect</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.7.1/dist/leaflet.css">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.css">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-MrcW6ZMFYlzcLA8Nl+NtUVF0sA7MsXsP1UyJoMp4YLEuNSfAP+JcXn/tWtIaxVXM" crossorigin="anonymous"></script>
+  <style>
+    html {
+      height: 100vh;
+      width: 100%;
+      touch-action: none;
+    }
+    body { 
+      margin: 0; 
+      position: relative;
+      overflow: hidden;
+      height: 100vh;
+      width: 100%;
+    }
+    #background-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: url('https://storage.googleapis.com/ee-layers/topo_mtn_racer_overlay.png');
+      background-size: cover;
+      background-position: center;
+      z-index: 2;
+      pointer-events: none;
+      display: block;
+    }
+    #background-overlay-top {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: url('https://storage.googleapis.com/ee-layers/topo_mtn_racer_overlay_top.png');
+      background-size: cover;
+      background-position: center;
+      z-index: 2;
+      pointer-events: none;
+      display: none;
+    }
+    #background-overlay-outside {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: url('https://storage.googleapis.com/ee-layers/topo_mtn_racer_outside_overlay_short.png');
+      background-size: cover;
+      background-position: center;
+      z-index: 2;
+      pointer-events: none;
+      display: none;
+    }
+    @media (max-width: 767.98px) {
+        #background-overlay, #background-overlay-top, #background-overlay-outside {
+            margin-bottom: 300px;
+        }
+    }
+    #map-container {
+      position: relative;
+      width: 100%;
+      height: 100vh;
+    }
+    #map { 
+      height: 100%; 
+      width: 100%; 
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 1;
+    }
+    #zoom-control {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-left: 10px;
+      margin-top: 10px;
+    }
+    #search-control {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-right: 10px;
+      margin-top: 10px;
+    }
+    .leaflet-control-geocoder {
+        border-radius: 4px;
+        background: white;
+        min-width: 26px;
+        min-height: 46px;
+        line-height: 46px;
+    }
+    .leaflet-control-geocoder-icon {
+        border-radius: 4px;
+        width: 46px;
+        height: 46px;
+        border: none;
+        background-color: white;
+        background-image: url(data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12.2 13l3.4 6.6c.6 1.1 2.5-.4 2-1.2l-4-6.2z'/%3E%3Ccircle cx='10.8' cy='8.9' r='3.9' fill='none' stroke='%23000' stroke-width='1.5'/%3E%3C/svg%3E);
+        background-repeat: no-repeat;
+        background-position: center;
+        cursor: pointer;
+    }
+    .leaflet-control-geocoder .leaflet-control-geocoder-alternatives a {
+       width: inherit;
+       height: inherit;
+       line-height: inherit;
+       font-family: sans-serif;
+    }
+    #style1-btn, #style2-btn, #style3-btn, #style4-btn, #style5-btn {
+        height: 46px;
+        background-color: white;
+        font-size: 1rem;
+        border-radius: 4px;
+        box-shadow: 0 1px 5px rgba(0, 0, 0, 0.65);
+        border: none;
+        padding: 0 10px;
+        margin: 0 5px;
+    }
+    /* New CSS for active buttons */
+    #style1-btn.active, #style2-btn.active {
+        background-color: black;
+        color: white;
+    }
+    #style3-btn.active, #style4-btn.active, #style5-btn.active {
+        background-color: black;
+        color: white;
+    }
+    #toggles {
+      position: absolute;
+      bottom: 10px;
+      z-index: 1000;
+      display: block;
+      width: 100%;
+      text-align: center;
+    }
+    @media (max-width: 767.98px) {
+        #toggles {
+            bottom: 100px;
+        }
+    }
+    button {
+      text-decoration: none;
+      color: black;
+    }
+    .leaflet-control-geocoder {
+        width: 300px!important;
+    }
+    .leaflet-control-container {
+        display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="map-container">
+    <div id="search-control"></div>
+    <div id="zoom-control"></div>
+    <div id="background-overlay"></div>
+    <div id="background-overlay-top"></div>
+    <div id="background-overlay-outside"></div>
+    <div id="map"></div>
+    <div id="toggles">
+    <div class="row">
+      <div class="col-md-8">
+      <span class="fw-bold">Color choice</span>
+      <br>
+      <button id="style1-btn" class="active">Navy | Orange | Gold</button>
+      <button id="style2-btn" class="mt-2 mt-md-0">Cyan | Magenta | Yellow</button>
+      </div>
+      <div class="col-md-4 mt-4 mt-md-0">
+      <span class="fw-bold">Shoe view</span>
+      <br>
+      <button id="style3-btn" class="active">Side</button>
+      <button id="style4-btn" class="mt-2 mt-md-0">Top</button>
+      <button id="style5-btn" class="mt-2 mt-md-0">Outside</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.7.1/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet-control-geocoder@2.4.0/dist/Control.Geocoder.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/leaflet-hash@0.2.1/leaflet-hash.min.js" type="text/javascript"></script>
+  <script>
+    // Initialize the map
+    const map = L.map('map', {
+      preferCanvas: true,
+      zoomControl: false,  // Disable default zoom control
+      maxZoom: 15
+    }).setView([46.8523, -121.7603], 10);
+
+    // Add custom zoom control to specific div
+    const zoomControl = L.control.zoom({
+      position: 'topleft'
+    });
+    zoomControl.addTo(map);
+    zoomControl._container.parentNode.removeChild(zoomControl._container);
+    document.getElementById('zoom-control').appendChild(zoomControl._container);
+
+    // Add Geocoder to the map
+    const geocoder = L.Control.geocoder({
+      position: 'topright',
+      defaultMarkGeocode: false,
+      collapsed: false,
+      placeholder: 'Search location...',
+      errorMessage: 'Location not found',
+      geocoder: L.Control.Geocoder.nominatim()
+    })
+    .on('markgeocode', function(e) {
+      var bbox = e.geocode.bbox;
+      var poly = L.polygon([
+        bbox.getSouthEast(),
+        bbox.getNorthEast(),
+        bbox.getNorthWest(),
+        bbox.getSouthWest()
+      ]);
+      map.fitBounds(poly.getBounds());
+    });
+    geocoder.addTo(map);
+    geocoder._container.parentNode.removeChild(geocoder._container);
+    document.getElementById('search-control').appendChild(geocoder._container);
+
+    // [Rest of the previous script remains the same]
+    // Decode elevation from RGB
+    function decodeElevation(r, g, b) {
+      return (r * 256 + g + b / 256) - 32768;
+    }
+
+    // Get color for slope (black to transparent) with dynamic max slope
+    function getColorForSlope(slope) {
+      // Dynamically set maxSlope based on current zoom level
+      const zoomLevel = map.getZoom();
+      let maxSlope;
+      
+      if (zoomLevel <= 10) {
+        maxSlope = 90;
+      } else if (zoomLevel === 11) {
+        maxSlope = 60;
+      } else if (zoomLevel === 12) {
+        maxSlope = 30;
+      } else if (zoomLevel === 13) {
+        maxSlope = 16;
+      } else {
+        maxSlope = 8;
+      }
+      
+      const normalizedSlope = slope / maxSlope;
+      const alpha = 1 - Math.min(normalizedSlope, 1); // Ensure alpha doesn't exceed 1
+      return `rgba(0, 0, 0, ${alpha})`;
+    }
+
+    // Get color for aspect (custom color ramp)
+    function getColorForAspect(aspect) {
+      if (aspect >= 0 && aspect < 90) {
+        // North to East: #f05232 to #226dab
+        const ratio = aspect / 90;
+        const r = Math.floor(240 - ratio * (240 - 34));
+        const g = Math.floor(82 - ratio * (82 - 109));
+        const b = Math.floor(50 + ratio * (171 - 50));
+        return `rgb(${r}, ${g}, ${b})`;
+      } else if (aspect >= 90 && aspect < 180) {
+        // East to South: #226dab to #f05232
+        const ratio = (aspect - 90) / 90;
+        const r = Math.floor(34 + ratio * (240 - 34));
+        const g = Math.floor(109 - ratio * (109 - 82));
+        const b = Math.floor(171 - ratio * (171 - 50));
+        return `rgb(${r}, ${g}, ${b})`;
+      } else if (aspect >= 180 && aspect < 270) {
+        // South to West: #f05232 to #f7cf1e
+        const ratio = (aspect - 180) / 90;
+        const r = Math.floor(240 + ratio * (247 - 240));
+        const g = Math.floor(82 + ratio * (207 - 82));
+        const b = Math.floor(50 - ratio * (50 - 30));
+        return `rgb(${r}, ${g}, ${b})`;
+      } else {
+        // West to North: #f7cf1e to #f05232
+        const ratio = (aspect - 270) / 90;
+        const r = Math.floor(247 - ratio * (247 - 240));
+        const g = Math.floor(207 - ratio * (207 - 82));
+        const b = Math.floor(30 + ratio * (50 - 30));
+        return `rgb(${r}, ${g}, ${b})`;
+      }
+    }
+    
+    // Function for the second style (new)
+    function getColorForAspectStyle2(aspect) {
+      if (aspect >= 0 && aspect < 90) {
+        // North to East: #ff00ff to #00ffff
+        const ratio = aspect / 90;
+        const r = Math.floor(255 - ratio * 255);
+        const g = Math.floor(0 + ratio * 255);
+        const b = Math.floor(255);
+        return `rgb(${r}, ${g}, ${b})`;
+      } else if (aspect >= 90 && aspect < 180) {
+        // East to South: #00ffff to #ff00ff
+        const ratio = (aspect - 90) / 90;
+        const r = Math.floor(0 + ratio * 255);
+        const g = Math.floor(255 - ratio * 255);
+        const b = Math.floor(255);
+        return `rgb(${r}, ${g}, ${b})`;
+      } else if (aspect >= 180 && aspect < 270) {
+        // South to West: #ff00ff to #ffff00
+        const ratio = (aspect - 180) / 90;
+        const r = Math.floor(255);
+        const g = Math.floor(0 + ratio * 255);
+        const b = Math.floor(255 - ratio * 255);
+        return `rgb(${r}, ${g}, ${b})`;
+      } else {
+        // West to North: #ffff00 to #ff00ff
+        const ratio = (aspect - 270) / 90;
+        const r = Math.floor(255);
+        const g = Math.floor(255 - ratio * 255);
+        const b = Math.floor(0 + ratio * 255);
+        return `rgb(${r}, ${g}, ${b})`;
+      }
+    }
+
+    // Calculate slope and aspect from elevation data
+    function calculateSlopeAndAspect(elevationData, x, y, width, height) {
+      const elevationAt = (dx, dy) => {
+        const nx = x + dx;
+        const ny = y + dy;
+        if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+          return elevationData[ny * width + nx];
+        }
+        return elevationData[y * width + x];  // Edge case handling
+      };
+
+      const dzdx = (elevationAt(1, 0) - elevationAt(-1, 0)) / 2;
+      const dzdy = (elevationAt(0, 1) - elevationAt(0, -1)) / 2;
+
+      const slope = Math.sqrt(dzdx ** 2 + dzdy ** 2);
+      const aspect = (Math.atan2(dzdy, -dzdx) * 180 / Math.PI + 360) % 360; // Aspect in degrees from north
+
+      return { slope, aspect };
+    }
+
+    // Slope layer using GridLayer
+    const SlopeLayer = L.GridLayer.extend({
+      createTile: function(coords, done) {
+        const tile = document.createElement('canvas');
+        tile.width = 256;
+        tile.height = 256;
+        const ctx = tile.getContext('2d');
+
+        const img = new Image();
+        img.crossOrigin = '';
+        img.src = `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${coords.z}/${coords.x}/${coords.y}.png`;
+
+        img.onload = function() {
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, tile.width, tile.height);
+          const data = imageData.data;
+          const elevationData = [];
+
+          // Store elevation data for slope calculation
+          for (let i = 0; i < data.length; i += 4) {
+            const elevation = decodeElevation(data[i], data[i + 1], data[i + 2]);
+            elevationData.push(elevation);
+          }
+
+          // Calculate slope for each pixel
+          for (let y = 0; y < 256; y++) {
+            for (let x = 0; x < 256; x++) {
+              const index = (y * 256 + x) * 4;
+              const { slope } = calculateSlopeAndAspect(elevationData, x, y, 256, 256);
+              const color = getColorForSlope(slope);
+              const [newR, newG, newB, alpha] = color.match(/\d+\.?\d*/g).map(Number);
+              data[index] = newR;
+              data[index + 1] = newG;
+              data[index + 2] = newB;
+              data[index + 3] = Math.floor(alpha * 255);
+            }
+          }
+
+          ctx.putImageData(imageData, 0, 0);
+          done(null, tile);
+        };
+
+        img.onerror = function() {
+          done("Error loading tile", tile);
+        };
+
+        return tile;
+      }
+    });
+
+    // Update AspectLayer to use a dynamic color function
+    let currentAspectStyle = 1;
+    const AspectLayer = L.GridLayer.extend({
+      createTile: function(coords, done) {
+        const tile = document.createElement('canvas');
+        tile.width = 256;
+        tile.height = 256;
+        const ctx = tile.getContext('2d');
+
+        const img = new Image();
+        img.crossOrigin = '';
+        img.src = `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${coords.z}/${coords.x}/${coords.y}.png`;
+
+        img.onload = function() {
+          ctx.drawImage(img, 0, 0);
+          const imageData = ctx.getImageData(0, 0, tile.width, tile.height);
+          const data = imageData.data;
+          const elevationData = [];
+
+          // Store elevation data for aspect calculation
+          for (let i = 0; i < data.length; i += 4) {
+            const elevation = decodeElevation(data[i], data[i + 1], data[i + 2]);
+            elevationData.push(elevation);
+          }
+
+          // Calculate aspect for each pixel
+          for (let y = 0; y < 256; y++) {
+            for (let x = 0; x < 256; x++) {
+              const index = (y * 256 + x) * 4;
+              const { aspect } = calculateSlopeAndAspect(elevationData, x, y, 256, 256);
+              const color =
+                currentAspectStyle === 1
+                  ? getColorForAspect(aspect)
+                  : getColorForAspectStyle2(aspect);
+              const [newR, newG, newB] = color.match(/\d+/g).map(Number);
+              data[index] = newR;
+              data[index + 1] = newG;
+              data[index + 2] = newB;
+              data[index + 3] = 255; // Fully opaque
+            }
+          }
+
+          ctx.putImageData(imageData, 0, 0);
+          done(null, tile);
+        };
+
+        img.onerror = function() {
+          done("Error loading tile", tile);
+        };
+
+        return tile;
+      }
+    });
+
+    // Recreate AspectLayer with new style when toggling
+    const aspectLayer = new AspectLayer();
+    aspectLayer.addTo(map);
+    
+    const slopeLayer = new SlopeLayer();
+    slopeLayer.addTo(map);
+
+    document.getElementById('style1-btn').addEventListener('click', () => {
+      currentAspectStyle = 1;
+      map.removeLayer(aspectLayer);
+      aspectLayer.addTo(map);
+      map.removeLayer(slopeLayer);
+      slopeLayer.addTo(map);
+      
+      // Toggle active class for color choice buttons
+      document.getElementById('style1-btn').classList.add('active');
+      document.getElementById('style2-btn').classList.remove('active');
+    });
+
+    document.getElementById('style2-btn').addEventListener('click', () => {
+      currentAspectStyle = 2;
+      map.removeLayer(aspectLayer);
+      aspectLayer.addTo(map);
+      map.removeLayer(slopeLayer);
+      slopeLayer.addTo(map);
+      
+      // Toggle active class for color choice buttons
+      document.getElementById('style2-btn').classList.add('active');
+      document.getElementById('style1-btn').classList.remove('active');
+    });
+
+    // Add overlay toggle functionality with active class
+    const overlay1 = document.getElementById('background-overlay');
+    const overlay2 = document.getElementById('background-overlay-top');
+    const overlay3 = document.getElementById('background-overlay-outside');
+    
+    document.getElementById('style3-btn').addEventListener('click', () => {
+      overlay1.style.display = overlay1.style.display === 'none' ? 'block' : 'block';
+      overlay2.style.display = 'none';
+      overlay3.style.display = 'none';
+      
+      // Toggle active class for shoe view buttons
+      document.getElementById('style3-btn').classList.add('active');
+      document.getElementById('style4-btn').classList.remove('active');
+      document.getElementById('style5-btn').classList.remove('active');
+    });
+
+    document.getElementById('style4-btn').addEventListener('click', () => {
+      overlay2.style.display = overlay2.style.display === 'none' ? 'block' : 'block';
+      overlay1.style.display = 'none';
+      overlay3.style.display = 'none';
+      
+      // Toggle active class for shoe view buttons
+      document.getElementById('style4-btn').classList.add('active');
+      document.getElementById('style3-btn').classList.remove('active');
+      document.getElementById('style5-btn').classList.remove('active');
+    });
+    
+    document.getElementById('style5-btn').addEventListener('click', () => {
+      overlay3.style.display = overlay3.style.display === 'none' ? 'block' : 'block';
+      overlay1.style.display = 'none';
+      overlay2.style.display = 'none';
+      
+      // Toggle active class for shoe view buttons
+      document.getElementById('style5-btn').classList.add('active');
+      document.getElementById('style4-btn').classList.remove('active');
+      document.getElementById('style3-btn').classList.remove('active');
+    });
+
+    var hash = new L.Hash(map);
+  </script>
+</body>
+</html>
